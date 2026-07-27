@@ -578,7 +578,7 @@ function TemplateCard({
           <div>
             <p className="text-sm font-medium">Upload your template</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Drop a <code className="bg-muted px-1 rounded">.html</code> file here or click to browse
+              Drop a <code className="bg-muted px-1 rounded">.docx</code>, <code className="bg-muted px-1 rounded">.pdf</code> or <code className="bg-muted px-1 rounded">.html</code> file here or click to browse
             </p>
           </div>
           {saving && (
@@ -587,7 +587,7 @@ function TemplateCard({
             </div>
           )}
         </div>
-        <input ref={inputRef} type="file" accept=".html,.htm" className="hidden" onChange={onInputChange} />
+        <input ref={inputRef} type="file" accept=".docx,.doc,.pdf,.html,.htm" className="hidden" onChange={onInputChange} />
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-wrap">
