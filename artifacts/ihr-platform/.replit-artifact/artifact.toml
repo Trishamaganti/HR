@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "iHR Platform"
+version = "1.0.0"
+id = "artifacts/ihr-platform"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20589
+
+[services.development]
+run = "pnpm --filter @workspace/ihr-platform run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ihr-platform", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ihr-platform/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20589"
+BASE_PATH = "/"

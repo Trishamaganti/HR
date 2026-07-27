@@ -1,8 +1,42 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
+import companiesRouter from "./companies";
+import jobsRouter from "./jobs";
+import applicationsRouter from "./applications";
+import candidatesRouter from "./candidates";
+import employeesRouter from "./employees";
+import attendanceRouter from "./attendance";
+import leavesRouter from "./leaves";
+import payrollRouter from "./payroll";
+import statsRouter from "./stats";
+import employeeCareerRouter from "./employee-career";
+import openaiChatRouter from "./openai-chat";
+import chatRouter from "./chat";
+import onboardingRequestsRouter from "./onboarding-requests";
+import documentSettingsRouter from "./document-settings";
+import documentTemplatesRouter from "./document-templates";
+import documentsRouter from "./documents";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
+router.use(companiesRouter);
+router.use(jobsRouter);
+router.use(applicationsRouter);
+router.use(onboardingRequestsRouter);
+router.use(candidatesRouter);
+router.use(employeesRouter);
+router.use(employeeCareerRouter);
+router.use(attendanceRouter);
+router.use(leavesRouter);
+router.use(payrollRouter);
+router.use(statsRouter);
+router.use(openaiChatRouter);
+router.use(chatRouter);
+router.use(documentSettingsRouter);
+router.use(documentTemplatesRouter);
+router.use(documentsRouter);
 
 export default router;
