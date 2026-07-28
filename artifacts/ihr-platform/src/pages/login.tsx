@@ -153,6 +153,42 @@ export default function Login() {
               Create an account
             </Link>
           </div>
+
+          {/* Quick access accounts */}
+          <div className="mt-4 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-semibold text-primary uppercase tracking-wide">Quick access — click to sign in</p>
+              <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded">pw: Demo@1234</span>
+            </div>
+            <div className="space-y-1.5">
+              {[
+                { label: "Org Admin",    email: "admin@txsprint.com"   },
+                { label: "John Mark",    email: "candidate1@gmail.com" },
+                { label: "Peter Wills",  email: "candidate2@gmail.com" },
+                { label: "Sarah Chen",   email: "candidate3@gmail.com" },
+                { label: "Alex Torres",  email: "candidate4@gmail.com" },
+                { label: "Jamie Rivera", email: "candidate5@gmail.com" },
+              ].map(({ label, email }) => (
+                <button
+                  key={email}
+                  type="button"
+                  className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs bg-background hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-colors cursor-pointer group"
+                  onClick={() => {
+                    form.setValue("identifier", email);
+                    form.setValue("password", "Demo@1234");
+                    form.handleSubmit(onSubmit)();
+                  }}
+                >
+                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">{label}</span>
+                  <span className="font-mono text-foreground">{email}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center pt-1">
+              Platform admin?{" "}
+              <a href="/platform-login" className="text-primary font-medium hover:underline">Use the admin console →</a>
+            </p>
+          </div>
         </div>
       </div>
     </div>
