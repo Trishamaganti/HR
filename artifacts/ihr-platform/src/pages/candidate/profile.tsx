@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layouts/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGetCandidate, useUpdateCandidate, getGetCandidateQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useUpdateCandidate } from "@workspace/api-client-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { getApiUrl } from "@/lib/api";
 import { Loader2, Plus, X, User, GraduationCap, MapPin, Phone, CreditCard, Users, Trash2, Upload, FileText, FolderOpen, CheckCircle2, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
@@ -297,10 +298,17 @@ export default function CandidateProfile() {
   const removeDoc = (key: string, idx: number) =>
     setDocs(prev => ({ ...prev, [key]: (prev[key] ?? []).filter((_, i) => i !== idx) }));
 
-  const { data: candidate, isLoading } = useGetCandidate(
-    user?.id || 0,
-    { query: { enabled: !!user?.id, queryKey: getGetCandidateQueryKey(user?.id || 0) } }
-  );
+  const BASE = getApiUrl();
+  const { data: candidate, isLoading } = useQuery({
+    queryKey: ["candidate-by-user", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const r = await fetch(`${BASE}/candidates?userId=${user.id}`);
+      const arr = await r.json();
+      return (arr[0] ?? null) as any;
+    },
+    enabled: !!user?.id,
+  });
 
   const updateMutation = useUpdateCandidate();
 
@@ -433,7 +441,7 @@ export default function CandidateProfile() {
     );
     const cleanRefs = (references || []).filter(r => r.name || r.email || r.phone);
     updateMutation.mutate({
-      id: user.id,
+      id: (candidate as any)?.id ?? user.id,
       data: {
         ...rest,
         emergencyContacts: emergencyContacts as any,
@@ -443,7 +451,7 @@ export default function CandidateProfile() {
     }, {
       onSuccess: (updated) => {
         toast({ title: "Profile Updated", description: "Your profile has been saved successfully." });
-        queryClient.setQueryData(getGetCandidateQueryKey(user.id), updated);
+        queryClient.invalidateQueries({ queryKey: ["candidate-by-user", user?.id] });
       },
       onError: () => {
         toast({ variant: "destructive", title: "Update Failed", description: "There was an error saving your profile." });

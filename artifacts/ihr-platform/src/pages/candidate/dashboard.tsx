@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useListApplications, useGetCandidate, useListAttendance, usePunchAttendance, getListAttendanceQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useListApplications, useListAttendance, usePunchAttendance, getListAttendanceQueryKey } from "@workspace/api-client-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useLocation as useWouterLocation } from "wouter";
+import { getApiUrl } from "@/lib/api";
 import {
   Bell, Briefcase, Building2, CheckCircle, Calendar,
   MapPin, Camera, StickyNote, LogIn, LogOut, Loader2,
@@ -32,7 +33,17 @@ export default function CandidateDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: candidate } = useGetCandidate(user?.id || 0, { query: { enabled: !!user?.id, queryKey: ["candidate", user?.id] } });
+  const BASE_URL = getApiUrl();
+  const { data: candidate } = useQuery({
+    queryKey: ["candidate-by-user", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const r = await fetch(`${BASE_URL}/candidates?userId=${user.id}`);
+      const arr = await r.json();
+      return (arr[0] ?? null) as any;
+    },
+    enabled: !!user?.id,
+  });
   const { data: applications } = useListApplications({ candidateId: user?.id }, { query: { enabled: !!user?.id, queryKey: ["applications", user?.id] } });
 
   const empId = user?.employeeId ? parseInt(user.employeeId as string, 10) : null;
@@ -53,7 +64,9 @@ export default function CandidateDashboard() {
   const [notesSaved, setNotesSaved] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState(DEMO_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState(
+    DEMO_NOTIFICATIONS.filter(n => user?.companyId || n.type !== "org")
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -148,7 +161,7 @@ export default function CandidateDashboard() {
   const { hasWorkRole, switchToWork, workRoleLabel, workHomePath } = useViewMode();
   const [, navigate] = useWouterLocation();
 
-  const orgName = user?.companyId ? "TxSprint Technologies" : null;
+  const orgName = user?.companyId ? (user?.companyName ?? null) : null;
   const showOrgSwitch = hasWorkRole && orgName;
 
   return (
@@ -320,13 +333,13 @@ export default function CandidateDashboard() {
                     <div className="bg-muted/30 rounded-lg p-2.5 text-center">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Punch In</p>
                       <p className="text-base font-bold text-green-600 mt-0.5">
-                        {todayRecord?.punchIn?.slice(0, 5) || "—"}
+                        {todayRecord?.punchIn ? format(new Date(todayRecord.punchIn), "HH:mm") : null || "—"}
                       </p>
                     </div>
                     <div className="bg-muted/30 rounded-lg p-2.5 text-center">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Punch Out</p>
                       <p className="text-base font-bold text-rose-600 mt-0.5">
-                        {todayRecord?.punchOut?.slice(0, 5) || "—"}
+                        {todayRecord?.punchOut ? format(new Date(todayRecord.punchOut), "HH:mm") : null || "—"}
                       </p>
                     </div>
                   </div>

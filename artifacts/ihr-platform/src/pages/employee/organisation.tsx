@@ -437,11 +437,11 @@ export default function EmployeeOrganisation() {
                         <div className="flex gap-3">
                           <Button size="sm" className="flex-1" disabled={isPunching || hasPunchedIn || !empId} onClick={() => handlePunch("punch_in")}>
                             {isPunching && !hasPunchedIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-                            {hasPunchedIn ? `Punched In ${todayRecord?.punchIn?.slice(0, 5)}` : "Punch In"}
+                            {hasPunchedIn ? `Punched In ${todayRecord?.punchIn ? format(new Date(todayRecord.punchIn), 'HH:mm') : null}` : "Punch In"}
                           </Button>
                           <Button size="sm" variant="outline" className="flex-1" disabled={isPunching || !hasPunchedIn || hasPunchedOut || !empId} onClick={() => handlePunch("punch_out")}>
                             {isPunching && hasPunchedIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
-                            {hasPunchedOut ? `Punched Out ${todayRecord?.punchOut?.slice(0, 5)}` : "Punch Out"}
+                            {hasPunchedOut ? `Punched Out ${todayRecord?.punchOut ? format(new Date(todayRecord.punchOut), 'HH:mm') : null}` : "Punch Out"}
                           </Button>
                         </div>
                       </div>
@@ -454,8 +454,8 @@ export default function EmployeeOrganisation() {
                         ) : (attendance ?? []).slice(-7).reverse().map((r) => (
                           <div key={r.id} className="flex items-center gap-2 text-xs p-2 bg-background rounded border">
                             <span className="w-28 font-medium shrink-0">{r.date}</span>
-                            <span className="text-muted-foreground">In: {r.punchIn?.slice(0, 5) ?? "—"}</span>
-                            <span className="text-muted-foreground ml-2">Out: {r.punchOut?.slice(0, 5) ?? "—"}</span>
+                            <span className="text-muted-foreground">In: {r.punchIn ? format(new Date(r.punchIn), 'HH:mm') : '—'}</span>
+                            <span className="text-muted-foreground ml-2">Out: {r.punchOut ? format(new Date(r.punchOut), 'HH:mm') : '—'}</span>
                             <Badge variant={r.status === "present" ? "default" : r.status === "absent" ? "destructive" : "secondary"} className="ml-auto text-[10px] capitalize">
                               {r.status.replace("_", " ")}
                             </Badge>
@@ -703,8 +703,8 @@ export default function EmployeeOrganisation() {
               <Select value={leaveForm.leaveType} onValueChange={(v) => setLeaveForm((f) => ({ ...f, leaveType: v }))}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["casual", "sick", "annual", "maternity", "paternity", "unpaid"].map((t) => (
-                    <SelectItem key={t} value={t} className="capitalize">{t.charAt(0).toUpperCase() + t.slice(1)} Leave</SelectItem>
+                  {[{ value: "casual", label: "Casual Leave" }, { value: "sick", label: "Sick Leave" }, { value: "earned", label: "Earned / Annual Leave" }, { value: "maternity", label: "Maternity Leave" }, { value: "paternity", label: "Paternity Leave" }].map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
