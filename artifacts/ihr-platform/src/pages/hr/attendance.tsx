@@ -13,10 +13,14 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { format, subDays } from "date-fns";
-import { Search, X, Clock, LogIn, LogOut, MapPin, User, CheckCircle2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { format, subDays, startOfMonth, endOfMonth, getDaysInMonth, addMonths, subMonths } from "date-fns";
+import {
+  Search, X, Clock, LogIn, LogOut, MapPin, User, CheckCircle2,
+  ChevronLeft, ChevronRight, LayoutList, CalendarDays,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getApiUrl } from "@/lib/api";
 
@@ -38,6 +42,213 @@ function getSites(): { id: string; name: string }[] {
   ];
 }
 
+// ─── Monthly Overview ────────────────────────────────────────────────────────
+function MonthlyOverview({
+  attendance,
+  employees,
+}: {
+  attendance: any[];
+  employees: any[];
+}) {
+  const [viewDate, setViewDate] = useState(new Date());
+  const [searchEmp, setSearchEmp] = useState("");
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth(); // 0-based
+  const daysInMonth = getDaysInMonth(viewDate);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  // Filter attendance for this month
+  const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const monthAttendance = useMemo(
+    () => attendance.filter(r => r.date.startsWith(monthStr)),
+    [attendance, monthStr]
+  );
+
+  // Build lookup: employeeId → day → record
+  const lookup = useMemo(() => {
+    const map = new Map<number, Map<number, any>>();
+    for (const r of monthAttendance) {
+      const day = parseInt(r.date.split("-")[2]);
+      if (!map.has(r.employeeId)) map.set(r.employeeId, new Map());
+      map.get(r.employeeId)!.set(day, r);
+    }
+    return map;
+  }, [monthAttendance]);
+
+  const today = new Date();
+  const todayY = today.getFullYear();
+  const todayM = today.getMonth();
+  const todayD = today.getDate();
+
+  const filteredEmployees = employees.filter(e =>
+    !searchEmp ||
+    (e.fullName ?? "").toLowerCase().includes(searchEmp.toLowerCase()) ||
+    (e.employeeCode ?? "").toLowerCase().includes(searchEmp.toLowerCase())
+  );
+
+  // Summary counts for the month
+  const presentCount = monthAttendance.filter(r => r.status === "present" || r.status === "late").length;
+  const absentCount = monthAttendance.filter(r => r.status === "absent").length;
+  const uniquePresentDays = new Set(monthAttendance.filter(r => r.status === "present" || r.status === "late").map(r => r.date)).size;
+
+  function cellContent(empId: number, day: number) {
+    const rec = lookup.get(empId)?.get(day);
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const isFuture = new Date(dateStr) > today && !(year === todayY && month === todayM && day === todayD);
+    const isToday = year === todayY && month === todayM && day === todayD;
+    const dow = new Date(dateStr).getDay(); // 0=Sun,6=Sat
+    const isWeekend = dow === 0 || dow === 6;
+
+    if (rec) {
+      if (rec.status === "present" || rec.status === "late") {
+        return (
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-[9px] font-bold text-white">P</div>
+            {rec.punchIn && <div className="text-[8px] text-green-700 leading-none">{format(new Date(rec.punchIn), 'HH:mm')}</div>}
+          </div>
+        );
+      }
+      if (rec.status === "absent") {
+        return <div className="w-6 h-6 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[9px] font-bold text-red-600">A</div>;
+      }
+      if (rec.status === "half_day") {
+        return <div className="w-6 h-6 rounded-full bg-yellow-100 border border-yellow-300 flex items-center justify-center text-[9px] font-bold text-yellow-700">H</div>;
+      }
+      return <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[9px] text-gray-500">?</div>;
+    }
+    if (isWeekend) return <div className="w-5 h-5 rounded bg-slate-100 flex items-center justify-center text-[8px] text-slate-400">–</div>;
+    if (isFuture) return <div className="w-5 h-5 rounded bg-muted/40 flex items-center justify-center text-[8px] text-muted-foreground/40">·</div>;
+    if (isToday) return <div className="w-6 h-6 rounded-full border-2 border-primary/40 flex items-center justify-center text-[9px] text-primary/60">?</div>;
+    // Past day with no record → absent
+    return <div className="w-6 h-6 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-[9px] font-bold text-red-400">A</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Month navigation */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setViewDate(d => subMonths(d, 1))}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="text-lg font-semibold w-44 text-center">{format(viewDate, "MMMM yyyy")}</div>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setViewDate(d => addMonths(d, 1))}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setViewDate(new Date())}>Today</Button>
+        </div>
+        <div className="flex gap-4 text-sm">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-green-500 inline-block" />
+            <span className="text-muted-foreground">Present: <strong className="text-foreground">{presentCount}</strong></span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
+            <span className="text-muted-foreground">Absent: <strong className="text-foreground">{absentCount}</strong></span>
+          </span>
+          <span className="text-muted-foreground">Working days: <strong className="text-foreground">{uniquePresentDays}</strong></span>
+        </div>
+      </div>
+
+      {/* Employee search */}
+      <div className="relative max-w-xs">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input placeholder="Filter employees…" value={searchEmp} onChange={e => setSearchEmp(e.target.value)} className="pl-8 h-8 text-sm" />
+        {searchEmp && (
+          <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setSearchEmp("")}>
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        )}
+      </div>
+
+      {/* Grid */}
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-muted/50">
+              <th className="sticky left-0 z-10 bg-muted/80 text-left px-3 py-2.5 font-semibold border-b border-r min-w-[180px]">
+                Employee
+              </th>
+              {days.map(d => {
+                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                const dow = new Date(dateStr).getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const isToday = year === todayY && month === todayM && d === todayD;
+                return (
+                  <th
+                    key={d}
+                    className={`px-1 py-2 text-center font-medium border-b min-w-[42px] ${isWeekend ? "text-muted-foreground/50 bg-slate-50" : isToday ? "bg-primary/5 text-primary" : ""}`}
+                  >
+                    <div>{["Su","Mo","Tu","We","Th","Fr","Sa"][dow]}</div>
+                    <div className={`text-[11px] font-bold mt-0.5 ${isToday ? "bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center mx-auto" : ""}`}>{d}</div>
+                  </th>
+                );
+              })}
+              <th className="px-3 py-2.5 text-center font-semibold border-b border-l min-w-[80px]">Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredEmployees.length === 0 ? (
+              <tr>
+                <td colSpan={days.length + 2} className="text-center py-8 text-muted-foreground">
+                  No employees found.
+                </td>
+              </tr>
+            ) : (
+              filteredEmployees.map((emp, idx) => {
+                const empRecs = lookup.get(emp.id);
+                const presentDays = empRecs
+                  ? [...empRecs.values()].filter(r => r.status === "present" || r.status === "late").length
+                  : 0;
+                const absentDays = empRecs
+                  ? [...empRecs.values()].filter(r => r.status === "absent").length
+                  : 0;
+                return (
+                  <tr key={emp.id} className={`border-b ${idx % 2 === 0 ? "bg-white" : "bg-muted/20"} hover:bg-primary/5 transition-colors`}>
+                    <td className="sticky left-0 z-10 px-3 py-2 border-r bg-inherit">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {(emp.fullName ?? "?")[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-medium truncate max-w-[120px]">{emp.fullName}</div>
+                          <div className="text-muted-foreground text-[10px]">{emp.employeeCode ?? ""}</div>
+                        </div>
+                      </div>
+                    </td>
+                    {days.map(d => (
+                      <td key={d} className="px-0.5 py-1.5 text-center border-r border-muted/30">
+                        <div className="flex items-center justify-center">
+                          {cellContent(emp.id, d)}
+                        </div>
+                      </td>
+                    ))}
+                    <td className="px-2 py-2 text-center border-l">
+                      <div className="text-green-600 font-semibold text-xs">{presentDays}P</div>
+                      <div className="text-red-500 font-semibold text-[10px]">{absentDays}A</div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-1">
+        <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-[9px] text-white font-bold">P</span> Present (with punch-in time)</span>
+        <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-red-100 border border-red-300 flex items-center justify-center text-[9px] text-red-600 font-bold">A</span> Absent</span>
+        <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-yellow-100 border border-yellow-300 flex items-center justify-center text-[9px] text-yellow-700 font-bold">H</span> Half Day</span>
+        <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded bg-slate-100 flex items-center justify-center text-[8px] text-slate-400">–</span> Weekend</span>
+        <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full border-2 border-primary/40 flex items-center justify-center text-[9px] text-primary/60">?</span> Today (no punch yet)</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function HrAttendance() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -271,153 +482,191 @@ export default function HrAttendance() {
           })}
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="p-4 space-y-4">
-            <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-xs font-medium text-muted-foreground">Quick:</span>
-              {presets.map(p => (
-                <Button
-                  key={p.label}
-                  variant={dateFrom === p.from && dateTo === p.to ? "default" : "outline"}
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
-                >
-                  {p.label}
-                </Button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">From Date</Label>
-                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40 h-9" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">To Date</Label>
-                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40 h-9" />
-              </div>
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, Emp ID…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="pl-8 h-9"
-                />
-                {search && (
-                  <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <X className="h-3.5 w-3.5 text-muted-foreground" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Main tabs */}
+        <Tabs defaultValue="daily">
+          <TabsList className="h-9">
+            <TabsTrigger value="daily" className="gap-1.5 text-xs">
+              <LayoutList className="h-3.5 w-3.5" /> Daily View
+            </TabsTrigger>
+            <TabsTrigger value="monthly" className="gap-1.5 text-xs">
+              <CalendarDays className="h-3.5 w-3.5" /> Monthly Overview
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Table */}
-        <Card>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-6 space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Emp ID</TableHead>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Location / Site</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Punch In</TableHead>
-                    <TableHead>Punch Out</TableHead>
-                    <TableHead>Hours</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        {attendance?.length === 0
-                          ? "No attendance records found. Use the Clock In / Out button to record attendance."
-                          : "No records match your search."}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filtered.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {(record as any).employeeCode ?? `#${record.employeeId}`}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
-                              {(record.employeeName ?? "?")[0]?.toUpperCase()}
-                            </div>
-                            <span className="font-medium text-sm">{record.employeeName ?? `Employee #${record.employeeId}`}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {(record as any).location ? (
-                            <Badge variant="outline" className="font-normal text-xs gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {(record as any).location}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{format(new Date(record.date + "T00:00:00"), "MMM d, yyyy")}</TableCell>
-                        <TableCell>
-                          {record.punchIn ? (
-                            <span className="text-green-600 font-medium text-sm">{record.punchIn.slice(11, 16)}</span>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {record.punchOut ? (
-                            <span className="text-orange-500 font-medium text-sm">{record.punchOut.slice(11, 16)}</span>
-                          ) : record.punchIn ? (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 animate-pulse">In Progress</Badge>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {record.hoursWorked ? (
-                            <span className="font-medium">{record.hoursWorked}h</span>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge
-                            variant={
-                              record.status === "present" ? "default" :
-                              record.status === "late" ? "secondary" :
-                              record.status === "absent" ? "destructive" : "outline"
-                            }
-                            className="capitalize"
-                          >
-                            {record.status.replace("_", " ")}
-                          </Badge>
-                        </TableCell>
+          {/* ── Daily View ── */}
+          <TabsContent value="daily" className="mt-4 space-y-4">
+            {/* Filters */}
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-xs font-medium text-muted-foreground">Quick:</span>
+                  {presets.map(p => (
+                    <Button
+                      key={p.label}
+                      variant={dateFrom === p.from && dateTo === p.to ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">From Date</Label>
+                    <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40 h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">To Date</Label>
+                    <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40 h-9" />
+                  </div>
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name, Emp ID…"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      className="pl-8 h-9"
+                    />
+                    {search && (
+                      <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                        <X className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Table */}
+            <Card>
+              <CardContent className="p-0">
+                {isLoading ? (
+                  <div className="p-6 space-y-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Emp ID</TableHead>
+                        <TableHead>Full Name</TableHead>
+                        <TableHead>Location / Site</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Punch In</TableHead>
+                        <TableHead>Punch Out</TableHead>
+                        <TableHead>Hours</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            {attendance?.length === 0
+                              ? "No attendance records found. Use the Clock In / Out button to record attendance."
+                              : "No records match your search."}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filtered.map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell className="font-mono text-xs text-muted-foreground">
+                              {(record as any).employeeCode ?? `#${record.employeeId}`}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                                  {(record.employeeName ?? "?")[0]?.toUpperCase()}
+                                </div>
+                                <span className="font-medium text-sm">{record.employeeName ?? `Employee #${record.employeeId}`}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {(record as any).location ? (
+                                <Badge variant="outline" className="font-normal text-xs gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {(record as any).location}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>{format(new Date(record.date + "T00:00:00"), "MMM d, yyyy")}</TableCell>
+                            <TableCell>
+                              {record.punchIn ? (
+                                <span className="text-green-600 font-medium text-sm">{format(new Date(record.punchIn), 'HH:mm')}</span>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {record.punchOut ? (
+                                <span className="text-orange-500 font-medium text-sm">{format(new Date(record.punchOut), 'HH:mm')}</span>
+                              ) : record.punchIn ? (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 animate-pulse">In Progress</Badge>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {record.hoursWorked ? (
+                                <span className="font-medium">{record.hoursWorked}h</span>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge
+                                variant={
+                                  record.status === "present" ? "default" :
+                                  record.status === "late" ? "secondary" :
+                                  record.status === "absent" ? "destructive" : "outline"
+                                }
+                                className="capitalize"
+                              >
+                                {record.status.replace("_", " ")}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
 
-        {!isLoading && filtered.length > 0 && (
-          <p className="text-xs text-muted-foreground text-right">
-            Showing {filtered.length} record{filtered.length !== 1 ? "s" : ""}
-            {dateFrom === dateTo
-              ? ` for ${format(new Date(dateFrom + "T00:00:00"), "MMM d, yyyy")}`
-              : ` from ${format(new Date(dateFrom + "T00:00:00"), "MMM d")} to ${format(new Date(dateTo + "T00:00:00"), "MMM d, yyyy")}`}
-          </p>
-        )}
+            {!isLoading && filtered.length > 0 && (
+              <p className="text-xs text-muted-foreground text-right">
+                Showing {filtered.length} record{filtered.length !== 1 ? "s" : ""}
+                {dateFrom === dateTo
+                  ? ` for ${format(new Date(dateFrom + "T00:00:00"), "MMM d, yyyy")}`
+                  : ` from ${format(new Date(dateFrom + "T00:00:00"), "MMM d")} to ${format(new Date(dateTo + "T00:00:00"), "MMM d, yyyy")}`}
+              </p>
+            )}
+          </TabsContent>
+
+          {/* ── Monthly Overview ── */}
+          <TabsContent value="monthly" className="mt-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  Monthly Attendance Overview
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Browse any month to see all employees' present / absent status day-by-day.</p>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-10 w-64" />
+                    <Skeleton className="h-64 w-full" />
+                  </div>
+                ) : (
+                  <MonthlyOverview attendance={attendance ?? []} employees={employees ?? []} />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

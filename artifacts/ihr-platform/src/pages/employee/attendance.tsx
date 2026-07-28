@@ -283,8 +283,8 @@ export default function EmployeeAttendance() {
 
                   {todayRecord && (
                     <div className="w-full text-center text-sm text-muted-foreground border-t pt-4 space-y-1">
-                      {todayRecord.punchIn && <div>Punched In: <span className="font-medium text-foreground">{todayRecord.punchIn.slice(0, 8)}</span></div>}
-                      {todayRecord.punchOut && <div>Punched Out: <span className="font-medium text-foreground">{todayRecord.punchOut.slice(0, 8)}</span></div>}
+                      {todayRecord.punchIn && <div>Punched In: <span className="font-medium text-foreground">{format(new Date(todayRecord.punchIn), 'HH:mm:ss')}</span></div>}
+                      {todayRecord.punchOut && <div>Punched Out: <span className="font-medium text-foreground">{format(new Date(todayRecord.punchOut), 'HH:mm:ss')}</span></div>}
                       {todayRecord.location && todayRecord.location !== "Office Headquarters" && (
                         <div className="flex items-center justify-center gap-1"><MapPin className="h-3 w-3" />{todayRecord.location}</div>
                       )}
@@ -351,8 +351,8 @@ export default function EmployeeAttendance() {
                         <TableRow key={dayStr} className={isToday ? "bg-primary/5" : ""}>
                           <TableCell className="font-medium">{format(day, 'EEE')}{isToday && <span className="ml-2 text-xs text-primary">(Today)</span>}</TableCell>
                           <TableCell>{format(day, 'MMM d')}</TableCell>
-                          <TableCell>{rec?.punchIn ? rec.punchIn.slice(0, 5) : isWeekend ? '—' : '-'}</TableCell>
-                          <TableCell>{rec?.punchOut ? rec.punchOut.slice(0, 5) : isWeekend ? '—' : '-'}</TableCell>
+                          <TableCell>{rec?.punchIn ? format(new Date(rec.punchIn), 'HH:mm') : isWeekend ? '—' : '-'}</TableCell>
+                          <TableCell>{rec?.punchOut ? format(new Date(rec.punchOut), 'HH:mm') : isWeekend ? '—' : '-'}</TableCell>
                           <TableCell>{rec?.hoursWorked ? `${rec.hoursWorked}h` : isWeekend ? '—' : '-'}</TableCell>
                           <TableCell className="text-right">
                             {isWeekend ? (
@@ -412,8 +412,8 @@ export default function EmployeeAttendance() {
                       {[...attendance].sort((a, b) => b.date.localeCompare(a.date)).map(record => (
                         <TableRow key={record.id}>
                           <TableCell className="font-medium">{format(new Date(record.date + 'T00:00:00'), 'MMM d, yyyy')}</TableCell>
-                          <TableCell>{record.punchIn ? record.punchIn.slice(0, 5) : '-'}</TableCell>
-                          <TableCell>{record.punchOut ? record.punchOut.slice(0, 5) : '-'}</TableCell>
+                          <TableCell>{record.punchIn ? format(new Date(record.punchIn), 'HH:mm') : '-'}</TableCell>
+                          <TableCell>{record.punchOut ? format(new Date(record.punchOut), 'HH:mm') : '-'}</TableCell>
                           <TableCell>{record.hoursWorked || '-'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">
                             {record.location && record.location !== "Office Headquarters" ? (
